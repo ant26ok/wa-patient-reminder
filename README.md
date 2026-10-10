@@ -65,7 +65,9 @@ Akses dashboard pada: **`http://localhost:3003`**
 | `GET` | `/api/appointments` | Mengambil daftar jadwal antrean |
 | `POST` | `/api/appointments` | Menambahkan jadwal kunjungan pasien baru |
 | `POST` | `/api/reminders/dispatch` | Memicu pengiriman reminder batch H-1 |
-| `POST` | `/api/webhook/incoming` | Webhook penerima pesan masuk WhatsApp |
+| `POST` | `/api/webhook/incoming` | Webhook penerima pesan masuk WhatsApp umum |
+| `POST` | `/api/webhook/qontak` | Webhook khusus integrasi resmi Mekari Qontak |
+| `GET` | `/api/qontak/status` | Cek status konfigurasi API Qontak |
 | `GET` | `/api/stats` | Statistik agregasi konfirmasi |
 
 ### Contoh Webhook Pesan Masuk (Inbound WA)
@@ -75,3 +77,27 @@ curl -X POST http://localhost:3003/api/webhook/incoming \
   -H "Content-Type: application/json" \
   -d '{"from": "081234567890", "text": "1 Hadir"}'
 ```
+
+---
+
+## Integrasi WhatsApp API Mekari Qontak
+
+Sistem telah dilengkapi modul resmi Mekari Qontak (`/api/open/v1/broadcasts/whatsapp/direct`).
+
+### 1. Konfigurasi Environment (`.env`)
+Salin `.env.example` ke `.env`:
+```bash
+QONTAK_BASE_URL=https://service-chat.qontak.com/api/open/v1
+QONTAK_TOKEN=your_qontak_bearer_token
+QONTAK_CHANNEL_INTEGRATION_ID=your_channel_integration_id
+QONTAK_TEMPLATE_ID=your_template_uuid
+```
+
+*Jika kredensial belum diisi, sistem berjalan dalam mode **Dry-Run** (simulasi log pengiriman).*
+
+### 2. Pemasangan Webhook di Dashboard Qontak
+Atur Webhook URL di dashboard Qontak ke:
+```
+http://208.76.40.125:3003/api/webhook/qontak
+```
+Setiap pasien membalas chat di WhatsApp, Qontak akan menembak webhook ini dan status antrean SIMRS langsung terupdate secara real-time.

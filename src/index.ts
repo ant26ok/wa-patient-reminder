@@ -14,6 +14,12 @@ import {
   processInboundReply, 
   formatReminderMessage 
 } from './reminder';
+import { 
+  isQontakConfigured, 
+  getQontakConfig, 
+  parseQontakInboundWebhook, 
+  sendWhatsAppViaQontak 
+} from './qontak';
 
 const app = new Hono();
 const db = initDb('reminder.sqlite');
@@ -29,6 +35,8 @@ app.get('/', (c) => {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const defDate = tomorrow.toISOString().slice(0, 10);
+  const qontakActive = isQontakConfigured();
+  const qontakCfg = getQontakConfig();
 
   const html = `<!DOCTYPE html>
 <html lang="id">
@@ -61,9 +69,9 @@ app.get('/', (c) => {
         </div>
       </div>
       <div class="flex items-center space-x-2">
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          Engine Active
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${qontakActive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'}">
+          <span class="w-1.5 h-1.5 rounded-full ${qontakActive ? 'bg-emerald-400 animate-pulse' : 'bg-cyan-400'}"></span>
+          ${qontakActive ? 'Qontak API Online' : 'Qontak Driver Ready'}
         </span>
       </div>
     </div>
@@ -350,6 +358,37 @@ app.post('/api/webhook/incoming', async (c) => {
 
   const result = await processInboundReply(db, phone, text);
   return c.json(result);
+});
+
+// REST API: Inbound WhatsApp Webhook khusus Mekari Qontak
+app.post('/api/webhook/qontak', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = parseQontakInboundWebhook(body);
+  if (!parsed) {
+    return c.json({ error: 'Unrecognized Qontak webhook payload structure' }, 400);
+  }
+
+  const result = await processInboundReply(db, parsed.phone, parsed.text);
+  return c.json({
+    status: 'success',
+    channel: 'qontak',
+    parsed_sender: parsed.phone,
+    sender_name: parsed.senderName || null,
+    result
+  });
+});
+
+// REST API: Status Konfigurasi Qontak
+app.get('/api/qontak/status', (c) => {
+  const cfg = getQontakConfig();
+  return c.json({
+    configured: isQontakConfigured(),
+    baseUrl: cfg.baseUrl,
+    hasToken: Boolean(cfg.token),
+    channelIntegrationId: cfg.channelIntegrationId || null,
+    templateId: cfg.templateId || null,
+    webhookUrl: `http://208.76.40.125:${PORT}/api/webhook/qontak`
+  });
 });
 
 const PORT = Number(process.env.PORT || 3003);

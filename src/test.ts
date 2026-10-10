@@ -13,6 +13,11 @@ import {
   processInboundReply, 
   dispatchDueReminders 
 } from './reminder';
+import { 
+  buildQontakReminderPayload, 
+  sendWhatsAppViaQontak, 
+  parseQontakInboundWebhook 
+} from './qontak';
 
 console.log('=== TEST: TWO-WAY WHATSAPP PATIENT REMINDER BOT ===');
 
@@ -144,4 +149,58 @@ assert.strictEqual(stats.cancelled, 1);
 assert.strictEqual(stats.sent, 1);
 console.log('✓ System stats aggregation passed:', stats);
 
-console.log('=== ALL 10 TEST SUITES PASSED SUCCESSFULLY ===');
+// 11. Test Qontak Reminder Payload Builder
+const qPayload = buildQontakReminderPayload(apt1, {
+  baseUrl: 'https://service-chat.qontak.com/api/open/v1',
+  token: 'mock-token',
+  channelIntegrationId: 'chan-123',
+  templateId: 'tmpl-456'
+});
+assert.strictEqual(qPayload.to_number, '6281234567890');
+assert.strictEqual(qPayload.channel_integration_id, 'chan-123');
+assert.strictEqual(qPayload.message_template_id, 'tmpl-456');
+assert.strictEqual(qPayload.parameters.body[0].value_text, 'Budi Santoso');
+assert.strictEqual(qPayload.parameters.body[1].value_text, 'Poli Penyakit Dalam');
+console.log('✓ Qontak broadcast payload builder passed');
+
+// 12. Test Qontak Mock Sender
+const mockFetch = (async (url: string, init: any) => {
+  assert(url.includes('/broadcasts/whatsapp/direct'));
+  assert.strictEqual(init.headers['Authorization'], 'Bearer mock-token');
+  return new Response(JSON.stringify({
+    status: 'success',
+    data: { id: 'broadcast-001' }
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}) as unknown as typeof fetch;
+
+// Temporarily set env for mock test
+process.env.QONTAK_TOKEN = 'mock-token';
+process.env.QONTAK_CHANNEL_INTEGRATION_ID = 'chan-123';
+const sendRes = await sendWhatsAppViaQontak(apt1, mockFetch);
+assert.strictEqual(sendRes.success, true);
+assert.strictEqual(sendRes.data.data.id, 'broadcast-001');
+delete process.env.QONTAK_TOKEN;
+delete process.env.QONTAK_CHANNEL_INTEGRATION_ID;
+console.log('✓ Qontak mock sender passed');
+
+// 13. Test Qontak Inbound Webhook Parser
+const parsed1 = parseQontakInboundWebhook({
+  event: 'message:created',
+  data: {
+    sender: { phone_number: '081234567890', name: 'Budi Santoso' },
+    text: '1 Hadir'
+  }
+});
+assert.strictEqual(parsed1?.phone, '6281234567890');
+assert.strictEqual(parsed1?.text, '1 Hadir');
+assert.strictEqual(parsed1?.senderName, 'Budi Santoso');
+
+const parsed2 = parseQontakInboundWebhook({
+  phone_number: '085678901234',
+  message: '2 Reschedule'
+});
+assert.strictEqual(parsed2?.phone, '6285678901234');
+assert.strictEqual(parsed2?.text, '2 Reschedule');
+console.log('✓ Qontak inbound webhook parser passed');
+
+console.log('=== ALL 13 TEST SUITES PASSED SUCCESSFULLY ===');

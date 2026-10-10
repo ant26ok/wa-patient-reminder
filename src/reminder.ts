@@ -7,6 +7,7 @@ import {
   findActiveAppointmentForPhone, 
   updateAppointmentStatus 
 } from './db';
+import { sendWhatsAppViaQontak } from './qontak';
 
 export type ParsedIntent = 'confirmed' | 'reschedule_requested' | 'cancelled' | 'unknown';
 
@@ -172,6 +173,13 @@ export async function dispatchDueReminders(
         await senderFn(apt.phone_number, text);
       } catch (e) {
         console.error(`Error sending reminder to ${apt.phone_number}:`, e);
+      }
+    } else {
+      // Default: dispatch via Qontak WhatsApp API
+      try {
+        await sendWhatsAppViaQontak(apt);
+      } catch (e) {
+        console.error(`Qontak dispatch error for ${apt.phone_number}:`, e);
       }
     }
   }
