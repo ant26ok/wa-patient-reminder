@@ -1,0 +1,22 @@
+{
+  "name": "wa-patient-reminder",
+  "version": "1.0.0",
+  "description": "Interactive Two-Way WhatsApp Patient Reminder Bot for Hospital Outpatient Queue",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts",
+    "test": "bun run src/test.ts"
+  },
+  "dependencies": {
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  }
+}
